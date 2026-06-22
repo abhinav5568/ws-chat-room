@@ -95,3 +95,30 @@ export async function handleTyping(senderId, payload) {
     }));
   }
 }
+
+export async function leave_session(userId, sessionKey) {
+  if (!sessionKey) return null;
+
+  const partnerId = await redis.hGet(sessionKey, userId);
+
+  // delete session first
+  await redis.del(sessionKey);
+
+  // clear currentSessionKey on leaving user's ws
+  const userWs = userMap.get(userId);
+  if (userWs) userWs.currentSessionKey = null;
+
+  // guard: partner may have already disconnected
+  if (!partnerId) return null;
+
+  const partnerWs = userMap.get(partnerId);
+  if (partnerWs) {
+    partnerWs.currentSessionKey = null;
+    partnerWs.send(JSON.stringify({
+      type: "USER_DISCONNECTED",
+      payload: { message: "Stranger has left the chat." }
+    }));
+  }
+
+  return partnerId;
+}

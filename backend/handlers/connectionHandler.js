@@ -65,6 +65,6 @@ async function handleClose(ws) {
       console.error("Session cleanup error:", err.message);
     }
   }else{
-    console.log('Couldnt destroy session, currentSession key or the userId is not connected with ws object');
+    console.log('no session found to destroy for user ', userId);
   }
 }

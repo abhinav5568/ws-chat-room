@@ -1,5 +1,5 @@
 import { joinQueue, leave_queue } from "../services/queueService.js";
-import { handleMessage, handleTyping } from "../services/sessionService.js";
+import { handleMessage, handleTyping, leave_session } from "../services/sessionService.js";
 import { isRateLimited } from "../services/rateLimitService.js";
 import userMap from "../state/userMap.js";
 
@@ -8,7 +8,8 @@ const MESSAGE_HANDLERS = {
   join:    handleJoin,
   message: handleChat,
   typing:  handleTypingIndicator,
-  leave_wait_queue: handleLeaveWaitQueue
+  leave_wait_queue: handleLeaveWaitQueue,
+  leave_session: handleLeaveSession
 };
 
 export async function handleIncomingMessage(ws, rawData) {
@@ -22,7 +23,7 @@ export async function handleIncomingMessage(ws, rawData) {
   }
 
   const handler = MESSAGE_HANDLERS[msg.type];
-
+  console.log('message type : ', msg.type)
   if (!handler) {
     sendError(ws, `Unknown message type: ${msg.type}`);
     return;
@@ -95,6 +96,24 @@ async function handleLeaveWaitQueue(ws) {
       }
     })
   )
+}
+
+async function handleLeaveSession(ws, payload) {
+  const session_key = payload.session_key || ws.currentSessionKey
+  const userId = ws.userId;
+
+  if (!session_key) {
+    sendError(ws, "No active session.");
+    return;
+  }
+
+  await leave_session(userId, session_key);
+  ws.currentSessionKey = null;
+
+  ws.send(JSON.stringify({
+    type: "LEFT_SESSION",
+    payload: { message: "You disconnected from stranger. " }
+  }));
 }
 
 // ---------- utility ----------
