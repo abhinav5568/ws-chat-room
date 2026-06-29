@@ -14,8 +14,6 @@ export async function createSession(user1, user2, commonInterests) {
   });
   await redis.expire(sessionKey, 86400); // 24hr TTL
 
-  // clean up redis interests
-  await redis.del(`interests:${user1}`, `interests:${user2}`);
 
   const payload = JSON.stringify({
     type: "MATCHED",
@@ -24,6 +22,7 @@ export async function createSession(user1, user2, commonInterests) {
       common_interests: commonInterests, 
     },
   });
+  console.log('session key : ', sessionKey)
 
   const ws1 = userMap.get(user1);
   const ws2 = userMap.get(user2);
@@ -31,11 +30,15 @@ export async function createSession(user1, user2, commonInterests) {
   if (ws1) { ws1.currentSessionKey = sessionKey; ws1.send(payload); }
   else{
     console.log('user1 websocket connection is not found')
+    return "SESSION_NOT_CREATED"
   }
   if (ws2) { ws2.currentSessionKey = sessionKey; ws2.send(payload); }
   else{
     console.log('user 2 websocket connection not found')
+    return "SESSION_NOT_CREATED"
   }
+
+  return "SESSION_CREATED"
 }
 
 export async function destroySession(sessionKey, disconnectedUserId) {
@@ -96,13 +99,18 @@ export async function handleTyping(senderId, payload) {
   }
 }
 
-export async function leave_session(userId, sessionKey) {
+export async function leaveSession(userId, sessionKey) {
   if (!sessionKey) return null;
 
   const partnerId = await redis.hGet(sessionKey, userId);
 
   // delete session first
-  await redis.del(sessionKey);
+  const flag = await redis.del(sessionKey);
+  if(flag == 1){
+    console.log('[leaveSession] Removed the session from hash, session id ', sessionKey)
+  }else{
+    console.log('[leaveSession] could not remove the session from hash, session id ', sessionKey)
+  }
 
   // clear currentSessionKey on leaving user's ws
   const userWs = userMap.get(userId);

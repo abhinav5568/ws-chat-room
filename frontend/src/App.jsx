@@ -53,12 +53,18 @@ export default function App() {
   const isTypingRef = useRef(false);
 
   useEffect(() => {
+    console.log("EFFECT MOUNT");
+    let isCleanUp = false;
     const socket = new WebSocket(WS_URL);
     socketRef.current = socket;
 
-    socket.addEventListener("open", () => setConnected(true));
+    socket.addEventListener("open", () => {
+      if(isCleanUp) return;
+      setConnected(true)
+    });
 
     socket.addEventListener("close", () => {
+      if(isCleanUp) return;
       setConnected(false);
       setMatched(false);
       setWaiting(false);
@@ -66,6 +72,7 @@ export default function App() {
     });
 
     socket.addEventListener("message", (event) => {
+      if(isCleanUp) return;
       try {
         const data = JSON.parse(event.data);
         switch (data.type) {
@@ -101,7 +108,8 @@ export default function App() {
           case "TYPING":
             setStrangerTyping(data.payload.is_typing);
             break;
-
+          
+          // when you leave a session mid
           case "LEFT_SESSION":
             setMatched(false);
             setMessages([]);
@@ -110,12 +118,13 @@ export default function App() {
             setStrangerTyping(false);
             setStatusText("You left. Find someone new?");
             break;
-
+          
+          // other user leaves session in mid
           case "USER_DISCONNECTED":
             setMatched(false);
             setStrangerTyping(false);
             sessionKeyRef.current = "";
-            setCommonInterests([]); // BUG FIX: was missing, left stale interests
+            setCommonInterests([]); 
             setMessages((prev) => [
               ...prev,
               { sender: "system", text: "Stranger disconnected." },
@@ -135,7 +144,11 @@ export default function App() {
       }
     });
 
-    return () => socket.close();
+    return () => {
+      console.log("EFFECT CLEANUP");
+      isCleanUp = true;
+      socket.close();
+    }
   }, []);
 
   useEffect(() => {
@@ -180,14 +193,14 @@ export default function App() {
     if (socketRef.current?.readyState !== WebSocket.OPEN) return;
     setWaiting(true);
     socketRef.current.send(
-      JSON.stringify({ type: "join", payload: { interests } }),
+      JSON.stringify({ type: "join_queue", payload: { interests } }),
     );
   }
 
   function leaveQueue() {
     setWaiting(false);
     if (socketRef.current?.readyState !== WebSocket.OPEN) return;
-    socketRef.current.send(JSON.stringify({ type: "leave_wait_queue" }));
+    socketRef.current.send(JSON.stringify({ type: "leave_queue" }));
   }
 
   function sendMsg() {
@@ -205,7 +218,7 @@ export default function App() {
     sendTypingEvent(false);
   }
 
-  function handleLeave() {
+  function leaveSession() {
     if (socketRef.current?.readyState !== WebSocket.OPEN) return;
     sessionKeyRef.current = ""; // no session is there
     socketRef.current.send(
@@ -374,7 +387,7 @@ export default function App() {
                   Send
                 </button>
                 <button
-                  onClick={handleLeave}
+                  onClick={leaveSession}
                   className="px-3 py-2 rounded-lg text-sm text-zinc-600 border border-zinc-800 hover:border-zinc-700 hover:text-red-400 transition-colors cursor-pointer"
                 >
                   Leave

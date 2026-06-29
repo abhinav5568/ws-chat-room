@@ -1,15 +1,15 @@
-import { joinQueue, leave_queue } from "../services/queueService.js";
-import { handleMessage, handleTyping, leave_session } from "../services/sessionService.js";
+import { joinQueue, leaveQueue } from "../services/queueService.js";
+import { handleMessage, handleTyping, leaveSession } from "../services/sessionService.js";
 import { isRateLimited } from "../services/rateLimitService.js";
 import userMap from "../state/userMap.js";
 
-// To add a new message type: write its handler below, add one line to this map.
+
 const MESSAGE_HANDLERS = {
-  join:    handleJoin,
-  message: handleChat,
-  typing:  handleTypingIndicator,
-  leave_wait_queue: handleLeaveWaitQueue,
-  leave_session: handleLeaveSession
+  join_queue:    handleJoin, // joins the waiting queue (either random matchking)
+  message: handleChat, // forward messages to the user connected via session stored in redis hash
+  typing:  handleTypingIndicator,  // typing indicator
+  leave_queue: handleLeaveWaitQueue, // leave the waiting queue (user waiting to get matched)
+  leave_session: handleLeaveSession // leave an ongoing session with other user
 };
 
 export async function handleIncomingMessage(ws, rawData) {
@@ -32,8 +32,8 @@ export async function handleIncomingMessage(ws, rawData) {
   try {
     await handler(ws, msg.payload || {});
   } catch (err) {
-    console.error(`Error handling "${msg.type}" for user ${ws.userId}:`, err.message);
-    sendError(ws, "An internal error occurred.");
+    console.error(`[handleIncomingMessages]Error handling "${msg.type}" for user ${ws.userId}:`, err.message);
+    sendError(ws, "[handleIncomingMessages] An internal error occurred.");
   }
 }
 
@@ -43,19 +43,21 @@ async function handleJoin(ws, payload) {
   const { interests = [] } = payload;
 
   // Sanitize interests: lowercase, trim, max 5 tags, max 20 chars each
-  const cleaned = interests
+  const userInterests = interests
     .map((i) => i.toString().toLowerCase().trim())
     .filter((i) => i.length > 0 && i.length <= 20)
     .slice(0, 5);
 
+  //notify the user about request received  
   ws.send(JSON.stringify({
     type: "STATUS_CHANGE",
-    payload: { message: cleaned.length > 0
-      ? `Searching for someone who likes: ${cleaned.join(", ")}...`
+    payload: { message: userInterests.length > 0
+      ? `Searching for someone who likes: ${userInterests.join(", ")}...`
       : "Searching for a stranger..." },
   }));
 
-  await joinQueue(ws.userId, cleaned);
+  // joinQueue in the queueService puts the user in their respective queus for searching a match. 
+  await joinQueue(ws, userInterests);
 }
 
 async function handleChat(ws, payload) {
@@ -87,7 +89,7 @@ async function handleTypingIndicator(ws, payload) {
 
 async function handleLeaveWaitQueue(ws) {
   const userId = ws.userId;
-  await leave_queue(userId);
+  await leaveQueue(userId);
   ws.send(
     JSON.stringify({
       type: "STATUS_CHANGE", 
@@ -107,7 +109,7 @@ async function handleLeaveSession(ws, payload) {
     return;
   }
 
-  await leave_session(userId, session_key);
+  await leaveSession(userId, session_key);
   ws.currentSessionKey = null;
 
   ws.send(JSON.stringify({

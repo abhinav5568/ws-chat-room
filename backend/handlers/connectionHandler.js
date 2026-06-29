@@ -5,6 +5,7 @@ import { destroySession } from "../services/sessionService.js";
 import { removeFromQueue } from "../services/queueService.js";
 import { redis } from "../config/redis.js";
 import userMap from "../state/userMap.js";
+import { cos_sim } from "@xenova/transformers";
 
 export function handleConnection(ws, req) {
   console.log("New client connected");
@@ -14,11 +15,12 @@ export function handleConnection(ws, req) {
   // user who refreshes keeps the same identity for the session duration.
   const rawCookie = req.headers.cookie || "";
   const parsedCookies = cookie.parse(rawCookie);
-  const userId = parsedCookies.user_id || uuidv4();
-
+  // const userId = parsedCookies.user_id || uuidv4();
+  const userId = uuidv4(); // testing so that browsers dont share same cookie jar
 
   ws.userId = userId;
   userMap.set(userId, ws);
+  console.log('user id : ', userId);
 
   // Tell the client their ID (new or restored)
   ws.send(JSON.stringify({
