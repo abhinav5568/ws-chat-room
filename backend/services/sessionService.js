@@ -4,6 +4,8 @@ import userMap from "../state/userMap.js";
 
 const SESSION_PREFIX = "chat:session:";
 
+const USERS_JOINED = "chat:users_queued";
+
 export async function createSession(user1, user2, commonInterests) {
   // random uuid to uniquely identify the session in redis hash...
   const sessionKey = `${SESSION_PREFIX}${uuidv4()}`;
@@ -38,6 +40,10 @@ export async function createSession(user1, user2, commonInterests) {
     return "SESSION_NOT_CREATED"
   }
 
+
+  // clear users from the USERS_JOINED map
+  await redis.hDel(USERS_JOINED, user1)
+  await redis.hDel(USERS_JOINED, user2)
   return "SESSION_CREATED"
 }
 
