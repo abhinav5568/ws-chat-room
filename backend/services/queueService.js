@@ -1,6 +1,6 @@
 import { redis } from "../config/redis.js";
 import { createSession } from "./sessionService.js";
-import { tryInterestMatch, tryRandomMatch } from "./matchMakingService.js";
+// import { tryInterestMatch, tryRandomMatch } from "./matchMakingService.js";
 import { ConvNextFeatureExtractor } from "@xenova/transformers";
 
 const QUEUE_KEY = "chat:waiting_queue";
