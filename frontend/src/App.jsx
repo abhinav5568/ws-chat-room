@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Cookies from "universal-cookie";
 
 const cookies = new Cookies();
-const MAX_CHARS = 300;
+const MAX_CHARS = 100;
 const WS_URL = "ws://localhost:8080";
 
 function StatusDot({ connected }) {

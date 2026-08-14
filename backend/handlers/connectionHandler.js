@@ -5,24 +5,21 @@ import { destroySession } from "../services/sessionService.js";
 import { removeFromQueue } from "../services/queueService.js";
 import { redis } from "../config/redis.js";
 import userMap from "../state/userMap.js";
-import { cos_sim } from "@xenova/transformers";
 
 export function handleConnection(ws, req) {
   console.log("New client connected");
 
-  // BUG FIX: cookie was being parsed but then ignored — a fresh UUID was
-  // always generated. Now we reuse the cookie UUID if it exists, so a
-  // user who refreshes keeps the same identity for the session duration.
+
   const rawCookie = req.headers.cookie || "";
   const parsedCookies = cookie.parse(rawCookie);
-  // const userId = parsedCookies.user_id || uuidv4();
+  // const userId = parsedCookies.user_id || uuidv4(); uncomment to test the app, since opening multiple windows to chat, shares same uuid cookie context
   const userId = uuidv4(); // testing so that browsers dont share same cookie jar
 
   ws.userId = userId;
   userMap.set(userId, ws);
   console.log('user id : ', userId);
 
-  // Tell the client their ID (new or restored)
+  // Tell the client their ID 
   ws.send(JSON.stringify({
     type: "INIT_SESSION",
     payload: { user_id: userId },
@@ -56,7 +53,7 @@ async function handleClose(ws) {
     // Remove from queue in case they disconnected while waiting
     await removeFromQueue(userId);
     // Clean up their interest set if they had one
-    await redis.del(`interests:${userId}`);
+    await redis.del(`user:interests${userId}`);
   }
 
   if (currentSessionKey && userId) {

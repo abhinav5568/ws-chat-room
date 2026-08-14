@@ -7,7 +7,7 @@ export async function isRateLimited(userId) {
   const key = `ratelimit:${userId}`;
   const now = Date.now();
 
-  // Remove all entries older than the window — this is what makes it "sliding"
+  // Remove all entries older than the window 
   await redis.zRemRangeByScore(key, 0, now - WINDOW_MS);
 
   const count = await redis.zCard(key);
